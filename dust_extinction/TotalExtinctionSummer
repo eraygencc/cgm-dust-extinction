@@ -1,0 +1,79 @@
+import numpy as np
+import pandas as pd
+import os
+from typing import Optional
+
+
+class DustContributionSummarizer:
+    """
+    Class to handle the summation of circumgalactic dust extinction contributions
+    from multiple lens galaxies to source galaxies.
+    """
+
+    def __init__(self, folder_path: str, file_prefix: str = "add_dust3_"):
+        self.folder_path = folder_path
+        self.file_prefix = file_prefix
+
+    @staticmethod
+    def _clean_array(arr: np.ndarray) -> np.ndarray:
+        arr[np.isinf(arr)] = 0
+        arr[np.isnan(arr)] = 0
+        return arr
+
+    @staticmethod
+    def _calculate_sum(filename: str) -> pd.Series:
+        idx, sep = np.loadtxt(filename, unpack=True)
+        idx = DustContributionSummarizer._clean_array(idx)
+        sep = DustContributionSummarizer._clean_array(sep)
+
+        df = pd.DataFrame({"index": idx.astype(int), "sep": sep})
+        sep_sum = df.groupby("index")["sep"].sum()
+        return sep_sum
+
+    def compute_total_contribution(self, file_count: int) -> np.ndarray:
+        total_sep = None
+
+        for i in range(file_count):
+            filename = os.path.join(self.folder_path, f"{self.file_prefix}{i}.txt")
+            sep = np.loadtxt(filename, unpack=True)
+            sep = self._clean_array(sep)
+
+            if total_sep is None:
+                total_sep = sep
+            else:
+                total_sep += sep
+
+        return total_sep
+
+
+class ExtinctionApplier:
+    """
+    Class to apply the calculated extinction contributions to galaxy magnitudes.
+    """
+
+    def __init__(self, total_sep: np.ndarray): #central wavelengths of the filters in units of nm
+        self.total_sep = total_sep
+        self.lambda_eff = {
+            "u": 365,
+            "g": 464,
+            "r": 658,
+            "i": 806
+        }
+
+    def apply_extinction(self, magnitudes: dict) -> dict:
+        """
+        Apply extinction correction to provided magnitudes.
+
+        Parameters:
+        - magnitudes (dict): Dictionary with keys ["u", "g", "r", "i"] and numpy arrays as values.
+
+        Returns:
+        - dict: Extinction-corrected magnitudes.
+        """
+        corrected = {}
+        for band, lam in self.lambda_eff.items():
+            add_ext = (551 / lam) * self.total_sep
+            corrected[band] = magnitudes[band] + add_ext
+        return corrected
+
+
