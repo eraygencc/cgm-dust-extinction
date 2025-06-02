@@ -1,0 +1,102 @@
+import numpy as np
+import pandas as pd
+import time
+import psutil
+from scipy import interpolate
+import scipy.spatial
+from astropy.cosmology import FlatLambdaCDM
+import astropy.units as u
+from colossus.halo import mass_so
+from threadpoolctl import threadpool_limits
+
+
+class DustExtinctionSimulator:
+    def __init__(self, x, y, z, lmhalo, lmstellar, output_dir="Txt_files", H0=H0, Om0=Om0):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.lmhalo = lmhalo
+        self.lmstellar = lmstellar
+        self.output_dir = output_dir
+
+        self.cosmo = FlatLambdaCDM(H0=H0, Om0=Om0, Tcmb0=2.725)
+        self.z_list = np.linspace(0.06966, 1.4, 300)
+        self.d_ang_func = interpolate.interp1d(
+            np.linspace(0, 1.7, 100000),
+            (self.cosmo.angular_diameter_distance(np.linspace(0, 1.7, 100000)) / u.Mpc) * (H0 / 100)
+        )
+        self.theta_max_func = interpolate.interp1d(self.z_list, self._sep_calculator(self.z_list))
+
+    def _sep_calculator(self, z_input):
+        D_ang = ((self.cosmo.angular_diameter_distance(z_input) / u.Mpc) * 0.7)
+        return ((1 / D_ang) / 0.00029) #conversion from physical to angular scales
+
+    def _calc_Rvir(self, log_hm, z_lens):
+        halo_mass = 10 ** log_hm
+        return mass_so.M_to_R(halo_mass, z_lens, '200c') #calcualte R_200 from halo mass and redshift
+
+    def _compute_amplitude(self, M_dust, R200_kpc, alpha=0.8, K_V=3.217, rmin_kpc=10):
+        r_eff_kpc = 0.91 * R200_kpc #scaling for extinction profile from Ménard et al.(2010)
+        rmax_kpc = R200_kpc #integrate up to R_200
+        r_eff_pc = r_eff_kpc * 1e3
+        rmin_pc = rmin_kpc * 1e3
+        rmax_pc = rmax_kpc * 1e3
+        integral_part = (rmax_pc ** (2 - alpha) - rmin_pc ** (2 - alpha))
+        prefactor = (2.5 * K_V * (2 - alpha)) / (2 * np.pi * np.log(10)) #K_V: absorption optical depth in V-band
+        return M_dust * prefactor / (r_eff_pc ** alpha * integral_part)
+
+    def _dist(self, x1, y1, x2, y2, z_lens, z_source, lmhalo_lens, lmstellar_lens, a=1.8181, b=-11.5616, alpha=-0.8):
+        mdust = 10 ** (a * lmstellar_lens + b)
+        R200 = self._calc_Rvir(lmhalo_lens, z_lens)
+        impact_parameter = R200 * 0.91
+        A_0 = self._compute_amplitude(mdust, R200)
+        distance_factor = (np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) * 0.00029)
+        scaling = 1000 * self.d_ang_func(z_lens) / impact_parameter
+        return np.where(z_lens < z_source, A_0 * (distance_factor * scaling) ** alpha, 0)
+
+    def _do_kdtree(self, combined_x_y_arrays, points, theta_max): #identify nearest neighbours
+        tree = scipy.spatial.cKDTree(combined_x_y_arrays)
+        return tree.query_ball_point(points, theta_max)
+
+    def simulate(self):
+        for i in range(len(self.z_list) - 1):
+            with threadpool_limits(limits=50):
+                start_time = time.time()
+
+                mask_source = self.z > self.z_list[i]
+                x_s = self.x[mask_source] * 60
+                y_s = self.y[mask_source] * 60
+                z_s = self.z[mask_source]
+
+                mask_lens = (self.z > self.z_list[i]) & (self.z < self.z_list[i + 1])
+                x_l = self.x[mask_lens] * 60
+                y_l = self.y[mask_lens] * 60
+                z_l = self.z[mask_lens]
+                lmhalo_l = self.lmhalo[mask_lens]
+                lmstellar_l = self.lmstellar[mask_lens]
+
+                comb_xy = np.column_stack([x_s, y_s])
+                points = list(np.column_stack([x_l, y_l]))
+
+                theta_max = self.theta_max_func(np.mean(z_l))
+                inds = self._do_kdtree(comb_xy, points, theta_max)
+
+                add_seps = np.zeros(len(x_s))
+
+                for l in range(len(x_l)):
+                    if not inds[l]:
+                        continue
+                    separations = self._dist(
+                        x_s[inds[l]], y_s[inds[l]],
+                        x_l[l], y_l[l],
+                        z_l[l], z_s[inds[l]],
+                        lmhalo_l[l], lmstellar_l[l]
+                    )
+                    separations = np.nan_to_num(separations, nan=0.0, posinf=0.0, neginf=0.0)
+                    add_seps[inds[l]] += separations
+
+                output_file = f"{self.output_dir}/add_dust3_{i}.txt"
+                np.savetxt(output_file, add_seps)
+
+                duration = time.time() - start_time
+                print(f"Iteration {i+1}: duration {duration:.2f}s, threads used: {len(psutil.Process().threads())}")
