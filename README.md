@@ -77,9 +77,9 @@ mass within $R_{200}$.
 
 - Only **foreground galaxies** contribute to extinction:
   
-  \[
+  $$
   z_\mathrm{lens} < z_\mathrm{source}
-  \]
+  $$
 
 - Sources at lower redshift than the lens receive zero extinction contribution.
 - Angular separations are converted to physical distances using the angular diameter distance.
@@ -107,6 +107,7 @@ mass within $R_{200}$.
 
 - The model does **not** include:
   - Dust clumpiness or anisotropy
+  - Dust grain composition
   - Time evolution of dust properties
 - These simplifications are intentional and reflect a trade-off between physical realism and computational scalability.
 
