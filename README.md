@@ -8,7 +8,7 @@ The implementation combines:
 - Stellar-to-dust mass scaling from **Peek et al. (2015)**
 - Radial extinction profile from **Ménard et al. (2010)**
 
-The code is designed so that it can be applied to any
+The code is so designed that it can be applied to any
 galaxy catalog providing sky positions, redshifts, and halo/stellar masses.
 
 ---
