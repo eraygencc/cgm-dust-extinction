@@ -28,7 +28,7 @@ def extinction_amplitude(
     alpha : float, optional
         Power-law slope of the extinction profile.
     K_V : float, optional
-        V-band extinction coefficient.
+        V-band absoroption optical depth per unit dust mass.
 
     Returns
     -------
