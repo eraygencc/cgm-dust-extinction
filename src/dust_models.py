@@ -9,21 +9,52 @@ def dust_mass_from_stellar_mass(log_m_star, A=2e3, beta=0.4):
 
 def extinction_amplitude(
     dust_mass,
-    r200_kpc,
-    alpha=-0.8,
-    k_v=3.217, #We choose SMC type dust in accordance with Ménard et al. (2010)
-    rmin_kpc=10.0, 
+    R200_kpc,
+    r_min_kpc=10.0,
+    alpha=0.8,
+    K_V=3.217,
 ):
     """
-    Compute extinction profile normalization following Ménard et al. (2010).
+    Compute the normalization of the CGM extinction profile.
+
+    Parameters
+    ----------
+    dust_mass : float or array-like
+        Total dust mass associated with the halo.
+    R200_kpc : float or array-like
+        Virial radius of the halo in kpc.
+    r_min_kpc : float, optional
+        Inner cutoff radius to avoid divergence.
+    alpha : float, optional
+        Power-law slope of the extinction profile.
+    K_V : float, optional
+        V-band extinction coefficient.
+
+    Returns
+    -------
+    A0 : float or array-like
+        Extinction normalization in magnitudes.
+
+    Notes
+    -----
+    The extinction profile follows:
+
+        A(r) ∝ r^{-α}
+
+    with normalization fixed by integrating the dust mass
+    over the halo volume.
     """
-    r_eff = 0.91 * r200_kpc
+    r_eff_kpc = 0.91 * R200_kpc  # Empirical scaling from Ménard et al.
+    r_max_kpc = R200_kpc
 
-    rmin_pc = rmin_kpc * 1e3
-    rmax_pc = r200_kpc * 1e3
-    r_eff_pc = r_eff * 1e3
+    # Convert to parsecs
+    r_eff_pc = r_eff_kpc * 1e3
+    r_min_pc = r_min_kpc * 1e3
+    r_max_pc = r_max_kpc * 1e3
 
-    integral = rmax_pc**(2 - alpha) - rmin_pc**(2 - alpha)
-    prefactor = (2.5 * k_v * (2 - alpha)) / (2 * np.pi * np.log(10))
+    integral = r_max_pc ** (2 - alpha) - r_min_pc ** (2 - alpha)
 
-    return dust_mass * prefactor / (r_eff_pc**alpha * integral)
+    prefactor = (2.5 * K_V * (2 - alpha)) / (2 * np.pi * np.log(10))
+
+    return dust_mass * prefactor / (r_eff_pc ** alpha * integral)
+
