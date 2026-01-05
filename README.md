@@ -79,9 +79,9 @@ mass within $R_{200}$.
 
 - Only **foreground galaxies** contribute to extinction:
   
-  $$
+  ```
   z_\mathrm{lens} < z_\mathrm{source}
-  $$
+  ```
 
 - Sources at lower redshift than the lens receive zero extinction contribution.
 - Angular separations are converted to physical distances using the angular diameter distance.
