@@ -39,10 +39,12 @@ The main assumptions are summarized below.
 ### 1. Dust Mass Assignment
 
 The dust mass is assumed to scale with stellar mass as:
+
 $$
 M_\mathrm{dust} \propto M_*^\beta
 $$
-with \beta = 0.4. It should be noted that we choose the upper range of the relation of Peek et al.(2015).
+
+with $ \beta = 0.4 $. It should be noted that we choose the upper range of the relation of Peek et al.(2015).
 
 ---
 
