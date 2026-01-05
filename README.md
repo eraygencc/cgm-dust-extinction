@@ -44,7 +44,7 @@ $$
 M_\mathrm{dust} \propto M_*^\beta
 $$
 
-with $ \beta = 0.4 $. It should be noted that we choose the upper range of the relation of Peek et al.(2015).
+with ``` \beta = 0.4 ```. It should be noted that we choose the upper range of the relation of Peek et al.(2015).
 
 ---
 
